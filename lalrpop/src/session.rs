@@ -51,6 +51,15 @@ pub struct Session {
     /// Emit report file about generated code
     pub emit_report: bool,
 
+    /// Emit human-readable grammar dump next to each generated `.rs` file.
+    pub emit_grammar: bool,
+
+    /// Strip `@L`/`@R` lookahead/lookbehind symbols from the grammar dump.
+    pub strip_grammar_positions: bool,
+
+    /// Drop alternatives containing `error` (`!`) from the grammar dump.
+    pub strip_grammar_errors: bool,
+
     pub color_config: ColorConfig,
 
     /// Stop after you find `max_errors` errors. If this value is 0,
@@ -106,6 +115,9 @@ impl Session {
             emit_comments: false,
             emit_whitespace: true,
             emit_report: false,
+            emit_grammar: false,
+            strip_grammar_positions: false,
+            strip_grammar_errors: false,
             color_config: ColorConfig::default(),
             max_errors: 1,
             macro_recursion_limit: 200,
@@ -134,6 +146,9 @@ impl Session {
             emit_comments: false,
             emit_whitespace: true,
             emit_report: false,
+            emit_grammar: false,
+            strip_grammar_positions: false,
+            strip_grammar_errors: false,
             color_config: ColorConfig::IfTty,
             max_errors: 1,
             macro_recursion_limit: 200,

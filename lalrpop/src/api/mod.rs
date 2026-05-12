@@ -143,6 +143,26 @@ impl Configuration {
         self
     }
 
+    /// If true, emit a human-readable grammar dump next to each generated `.rs` file.
+    /// The dump is written to `<basename>.grammar` in the same output directory.
+    pub fn emit_grammar(&mut self, val: bool) -> &mut Configuration {
+        self.session.emit_grammar = val;
+        self
+    }
+
+    /// If true, strip `@L`/`@R` (lookahead/lookbehind) symbols from the grammar dump.
+    pub fn strip_grammar_positions(&mut self, val: bool) -> &mut Configuration {
+        self.session.strip_grammar_positions = val;
+        self
+    }
+
+    /// If true, drop any alternative containing `error` (`!`) from the grammar dump.
+    /// Nonterminals with no remaining alternatives are omitted entirely.
+    pub fn strip_grammar_errors(&mut self, val: bool) -> &mut Configuration {
+        self.session.strip_grammar_errors = val;
+        self
+    }
+
     /// Minimal logs: only for errors that halt progress.
     pub fn log_quiet(&mut self) -> &mut Configuration {
         self.session.log.set_level(Level::Taciturn);

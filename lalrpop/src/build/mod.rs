@@ -26,6 +26,7 @@ use std::rc::Rc;
 
 mod action;
 mod fake_term;
+mod grammar_dump;
 
 use self::fake_term::FakeTerminal;
 
@@ -62,7 +63,8 @@ pub fn process_file<P: AsRef<Path>>(session: Rc<Session>, lalrpop_file: P) -> io
     let lalrpop_file = lalrpop_file.as_ref();
     let rs_file = resolve_rs_file(&session, lalrpop_file)?;
     let report_file = resolve_report_file(&session, lalrpop_file)?;
-    process_file_into(session, lalrpop_file, &rs_file, &report_file)
+    let grammar_file = resolve_grammar_file(&session, lalrpop_file)?;
+    process_file_into(session, lalrpop_file, &rs_file, &report_file, &grammar_file)
 }
 
 fn resolve_rs_file(session: &Session, lalrpop_file: &Path) -> io::Result<PathBuf> {
@@ -71,6 +73,10 @@ fn resolve_rs_file(session: &Session, lalrpop_file: &Path) -> io::Result<PathBuf
 
 fn resolve_report_file(session: &Session, lalrpop_file: &Path) -> io::Result<PathBuf> {
     gen_resolve_file(session, lalrpop_file, "report")
+}
+
+fn resolve_grammar_file(session: &Session, lalrpop_file: &Path) -> io::Result<PathBuf> {
+    gen_resolve_file(session, lalrpop_file, "grammar")
 }
 
 fn gen_resolve_file(session: &Session, lalrpop_file: &Path, ext: &str) -> io::Result<PathBuf> {
@@ -150,6 +156,7 @@ fn process_file_into(
     lalrpop_file: &Path,
     rs_file: &Path,
     report_file: &Path,
+    grammar_file: &Path,
 ) -> io::Result<()> {
     session.emit_rerun_directive(lalrpop_file);
     if session.force_build || needs_rebuild(lalrpop_file, rs_file)? {
@@ -180,7 +187,11 @@ fn process_file_into(
         // generation fails at some point, we don't leave a partial
         // file behind.
         {
-            let grammar = parse_and_normalize_grammar(&session, &file_text)?;
+            let pt_grammar = parse_grammar_pt(&file_text)?;
+            if session.emit_grammar {
+                emit_grammar_file(grammar_file, &pt_grammar, &session)?;
+            }
+            let grammar = normalize_grammar(&session, &file_text, pt_grammar)?;
             let buffer = emit_recursive_ascent(&session, &grammar, report_file)?;
             let mut output_file = fs::File::create(rs_file)?;
             writeln!(output_file, "{LALRPOP_VERSION_HEADER}")?;
@@ -287,14 +298,33 @@ fn lalrpop_files<P: AsRef<Path>>(root_dir: P) -> io::Result<Vec<PathBuf>> {
     Ok(result)
 }
 
-fn parse_and_normalize_grammar(session: &Session, file_text: &FileText) -> io::Result<r::Grammar> {
-    let grammar = parser::parse_grammar(file_text.text())
-        .map_err(|error| report_parse_error(file_text, error, report_error))?;
+fn parse_grammar_pt(file_text: &FileText) -> io::Result<pt::Grammar> {
+    parser::parse_grammar(file_text.text())
+        .map_err(|error| report_parse_error(file_text, error, report_error))
+}
 
+fn normalize_grammar(
+    session: &Session,
+    file_text: &FileText,
+    grammar: pt::Grammar,
+) -> io::Result<r::Grammar> {
     match normalize::normalize(session, grammar) {
         Ok(grammar) => Ok(grammar),
-        Err(error) => Err(report_error(file_text, error.span, &error.message))?,
+        Err(error) => Err(report_error(file_text, error.span, &error.message)),
     }
+}
+
+fn emit_grammar_file(path: &Path, grammar: &pt::Grammar, session: &Session) -> io::Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let file = fs::File::create(path)?;
+    let mut writer = io::BufWriter::new(file);
+    let opts = grammar_dump::GrammarDumpOptions {
+        strip_positions: session.strip_grammar_positions,
+        strip_errors: session.strip_grammar_errors,
+    };
+    grammar_dump::write_grammar_dump(&mut writer, grammar, opts)
 }
 
 /// Reports a parse error via a custom reporter.

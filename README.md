@@ -40,6 +40,32 @@ to! Here are some tips:
 - docs.rs API documentation for [lalrpop](https://docs.rs/lalrpop/latest/lalrpop/) and [lalrpop-util]
 - If you have any questions join our [gitter lobby].
 
+### Dumping the grammar (optional)
+
+When LALRPOP is invoked from a downstream crate's `build.rs`, you can ask it to write a human-readable rendering of each `.lalrpop` grammar alongside the generated `.rs` file. The dump uses a clean BNF-like form and is written as `<basename>.grammar` in the same output directory.
+
+```rust
+// build.rs
+fn main() {
+    lalrpop::Configuration::new()
+        .emit_grammar(true)              // write `<basename>.grammar`
+        .strip_grammar_positions(true)   // omit `@L` / `@R` symbols
+        .strip_grammar_errors(true)      // drop alternatives containing `!`
+        .process()
+        .unwrap();
+}
+```
+
+All three methods default to `false`, so existing builds are unaffected. Only `emit_grammar(true)` is required to enable the dump; the two `strip_*` flags independently control whether position markers (`@L`, `@R`) and error-recovery alternatives (`!`) appear in the output.
+
+Under the standard Cargo build-script convention, the dump for `src/foo.lalrpop` is written to:
+
+```
+target/<profile>/build/<crate>-<hash>/out/foo.grammar
+```
+
+(i.e. alongside the generated `foo.rs` in `$OUT_DIR`). If you call `set_out_dir(...)` to override the output directory, the `.grammar` file is placed next to the `.rs` file there instead.
+
 ### Example Uses
 
 - [LALRPOP] is itself implemented in LALRPOP.
